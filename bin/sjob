@@ -1,0 +1,258 @@
+#!/usr/bin/bash
+
+# Script Information
+# Version: 1.0.0
+# Author: Matheus Schossler
+# Date: 2024-05-26
+# Description: Submit Jupyter Notebook jobs to RIS LSF cluster with customizable parameters.
+
+# Default parameter values
+group_name="zohar"
+docker_image="mschossler/jupyter-cuda1241v3"
+port=$((RANDOM % 998 + 8001))
+port2=$((port + 1))
+port3=$((port + 2))
+cores="12"
+memory="32GB"
+gpus="2"
+gmodel="3"
+exclusive="yes"
+nexclusive=1
+select="gpuhost && "
+interactive=0
+queue="general"
+kjob=0
+output_command=0 
+extra_requirement=""
+
+# Function to display help message
+show_help() {
+  cat << EOF
+Usage: sjob [options]
+
+Options:
+  -c <cores>         Set the number of cores (default: $cores)
+  -m <memory>        Set the memory in GB (default: $memory)
+  -g <gpus>          Set the number of GPUs (default: $gpus)
+  -t <gmodel>        Set the GPU model (default: $gmodel)
+                     1 = TeslaV100_SXM2_32GB
+                     2 = NVIDIAA40
+                     3 = NVIDIAA100_SXM4_40GB
+                     4 = NVIDIAA100_PCIE_40GB
+                     5 = NVIDIAA100_SXM4_80GB
+                     6 = NVIDIAA10080GBPCIe
+                     7 = NVIDIAH100PCIe
+  -x                 Switch GPU exclusive mode (default: $exclusive)
+  -i                 Switch interactive mode (default: $interactive)
+  -p <port>          Set the primary port (default: random number between 8001 and 8999, currently: $port)
+                     Second TCP port is primary port + 1 (currently: $port2 and $port3)
+  -docker <image>    Set the Docker image (default: $docker_image)
+  -group <group>     Set the group name (default: $group_name)
+  -k                 Kill the job immediately after submission (for testing purposes)
+  -o                 Output the bsub command to a file
+  -h                 Show this help message
+EOF
+  exit 0
+}
+
+# Change to the home directory
+cd "$HOME"
+
+# Check and create user storage directory if it doesn't exist
+user_storage_directory="/storage1/fs1/$group_name/Active/$USER"
+if [ ! -d "$user_storage_directory" ]; then
+  mkdir -p "$user_storage_directory"
+  echo "Created directory: $user_storage_directory"
+fi
+
+# Parsing command-line arguments
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p) port="$2"; shift ;;
+    -c) cores="$2"; shift ;;
+    -m) memory="${2}GB"; shift ;;
+    -g) gpus="$2"; shift ;;
+    -t) gmodel="$2"; shift ;;
+    -x) nexclusive=0 ;;
+    -i) interactive=1 ;;
+    -k) kjob=1 ;;
+    -docker) docker_image="$2"; shift ;;
+    -group) group_name="$2"; shift ;;
+    -h) show_help ;;
+    -o) output_command=1 ;;
+    -r) extra_requirement="&& $2"; shift ;;
+    *)
+      echo "****************************"
+      echo "* Error: Invalid argument. *"
+      echo "****************************"
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+# Switch GPU exclusive mode
+if [ "$nexclusive" -eq 0 ]; then
+  exclusive="no"
+fi
+
+# Adjust model if GPUs are set to 0
+if [ "$gpus" -eq 0 ]; then
+  select=""
+  gmodel="null"
+else
+  select="gpuhost && "
+fi
+
+# Set GPU model names based on gmodel value
+case "$gmodel" in
+  1) gmodel="TeslaV100_SXM2_32GB"; ngmodel="1" ;;
+  2) gmodel="NVIDIAA40"; ngmodel="2" ;;
+  3) gmodel="NVIDIAA100_SXM4_40GB"; ngmodel="3" ;;
+  4) gmodel="NVIDIAA100_PCIE_40GB"; ngmodel="4" ;;
+  5) gmodel="NVIDIAA100_SXM4_80GB"; ngmodel="5" ;;
+  6) gmodel="NVIDIAA10080GBPCIe"; ngmodel="6" ;;
+  7) gmodel="NVIDIAH100PCIe"; ngmodel="7" ;;
+  null) gmodel="null"; ngmodel="null" ;;
+  *)
+    echo "*****************************"
+    echo "* Error: Invalid GPU model. *"
+    echo "*****************************"
+    exit 1
+    ;;
+esac
+
+# Generate a unique identifier using the current date and time
+timestamp=$(date +"%Y%m%d%H%M%S")
+
+# Construct job name
+job_name="jupyter_I${interactive}_${cores}C_${memory}_G${gpus}T${ngmodel}_E${nexclusive}_K${kjob}_P${port: -3}_${timestamp}"
+
+# Get the current time in format "May 25 17:57 CDT"
+submission_time=$(date +"%b %d %H:%M %Z")
+
+# Define the path to the jobs_submitted file
+jobs_submitted_file="/home/$USER/jobs_submitted"
+
+# Add titles to the jobs_submitted_csv_file if it doesn't already exist
+csv_file="${jobs_submitted_file}.csv"
+format_file="%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n"
+if [ ! -f "$csv_file" ]; then
+  printf $format_file \
+    "Cores" "Memory" "GPUs" "GPUmodel" "Exclusive" "Submission_Time" "JobID" "Queue" "Docker_Image" "Job_Name" "Token" "Port" \
+    >> "$csv_file"
+fi
+
+# Function to print to the jobs_submitted_csv_file
+print_to_file() {
+  local empty_string="_"
+  printf $format_file \
+    "$cores" "$memory" "$gpus" "$gmodel" "$exclusive" "$submission_time" "$job_id" "$queue" "$docker_image" "$job_name" "$token" "$port" \
+    >> "$csv_file"
+  cp "$csv_file" "$user_storage_directory/."
+}
+
+
+# Function to print job details
+print_job_details() {
+  echo "------------------------------------------------------------------------------------------------------------------------"
+  local format_stdout="%-55s %-10s %-25s %-30s\n"
+  printf "$format_stdout" "Job Name" "JobID" "Submission Time" "Docker Image"
+  printf "$format_stdout" "$job_name" "$job_id" "$submission_time" "$docker_image"
+  echo "------------------------------------------------------------------------------------------------------------------------"
+}
+
+token=$(python3 -c "import secrets; print(secrets.token_urlsafe(24).replace('-', '_'))")
+job_command="jupyter lab --allow-root --ip=0.0.0.0 --port $port --NotebookApp.allow_origin=* --NotebookApp.token=\"$token\""
+
+# Function to construct the bsub command
+construct_bsub_command() {
+  # Set queue based on interactive mode
+  local queue_flag
+  if [ "$interactive" -eq 1 ]; then
+    queue_flag="-Is -q $queue"
+  else
+    queue_flag="-q $queue"
+  fi
+
+  local docker_volumes="/scratch1/fs1/$group_name:/home/$USER/scratch1 /storage1/fs1/$group_name/Active/$USER:/home/$USER/storage1"
+  local resource_requirements="select[${select}port$port=1 && port$port2=1  && port$port3=1 ${extra_requirement} ] span[hosts=1] rusage[mem=$memory]"
+
+  local bsub_command="
+    LSF_DOCKER_SHM_SIZE=10g
+    JUPYTER_ENABLE_LAB=True
+    LSF_DOCKER_VOLUMES=\"$docker_volumes\"
+    LSF_DOCKER_PORTS=\"$port $port2 $port3/tcp\"
+    PATH=\"/opt/conda/bin:/usr/local/cuda/bin:$PATH\"
+    bsub $queue_flag -n $cores -M $memory -R \"$resource_requirements\"
+    -G compute-$group_name -J \"$job_name\"
+  "
+
+  if [ "$gpus" -gt 0 ]; then
+    local gpu_requirements="-gpu \"num=$gpus:gmodel=$gmodel:j_exclusive=$exclusive\""
+    bsub_command="$bsub_command $gpu_requirements"
+  fi
+
+  bsub_command="$bsub_command -a \"docker($docker_image)\" $job_command"
+
+  # Remove newlines for final command
+  bsub_command=$(echo $bsub_command | tr -s ' ')
+  printf "$bsub_command"
+}
+
+# Set queue based on interactive mode
+if [ "$interactive" -eq 1 ]; then
+  queue="general-interactive"
+else
+  queue="general"
+fi
+
+# Submit job function
+submit_job() {
+  bsub_command=$(construct_bsub_command)
+  if [ "$output_command" -eq 1 ]; then
+    echo "$bsub_command" > "$user_storage_directory/bsub_command.txt"
+  else
+    bsub_output=$(eval $bsub_command)
+    echo "$bsub_output"
+    
+    job_id=$(echo "$bsub_output" | awk -F'[<>]' '/Job/ {print $2}')
+    print_job_details
+    print_to_file
+
+    # Kill the job immediately after submission (for testing purposes)
+    if [ "$kjob" -eq 1 ]; then
+      bkill "$job_id"
+    fi
+  fi
+}
+
+# Interactive job function
+submit_interactive_job() {
+  job_id="null"
+  
+  print_job_details
+  print_to_file
+
+  if [ "$output_command" -eq 1 ]; then
+    echo "$(construct_bsub_command)" > "$user_storage_directory/bsub_command.txt"
+  else
+    # Start interactive job if kill flag is not passed (for testing purposes)
+    if [ "$kjob" -ne 1 ]; then
+      eval $(construct_bsub_command)
+    else
+      echo "Job not submitted"
+    fi
+  fi
+}
+
+# Choose between interactive or non-interactive job submission
+if [ "$interactive" -eq 0 ]; then
+  submit_job
+else
+  submit_interactive_job
+fi
+
+
+# Write the job_id to the last_job_id file
+echo "$job_id" > "$HOME/.bin/last_job_id"

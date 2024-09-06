@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Check if session name is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <session_name>"
+  exit 1
+fi
+
+# Variables
+SESSION_NAME=$1
+LOG_DIR="$HOME/storage1/screen_logs"
+DATE=$(date +%Y%m%d%H%M%S)
+LOG_FILE="${LOG_DIR}/${SESSION_NAME}_${DATE}.log"
+
+# Create log directory if it doesn't exist
+mkdir -p $LOG_DIR
+
+# Create a new screen session with logging enabled and attach to it
+screen -S $SESSION_NAME -L -Logfile $LOG_FILE
+
+echo "Screen session '$SESSION_NAME' created and logging to $LOG_FILE"
+

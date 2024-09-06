@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Try the first command
+bhosts -gpu -l > ~/storage1/gpu-hosts-full.txt
+
+# Check if the first command succeeded
+if [ $? -ne 0 ]; then
+  # If the first command failed, try the second command
+  bhosts -gpu -l > /storage1/fs1/zohar/Active/$USER/gpu-hosts-full.txt  
+  # Check if the second command succeeded
+  if [ $? -eq 0 ]; then
+    echo "Output successfully written to /storage1/fs1/zohar/Active/$USER/gpu-hosts-full.txt"
+  else
+    echo "Both attempts failed."
+  fi
+else
+  echo "Output successfully written to ~/sotorage1/gpu-hosts-full.txt"
+fi

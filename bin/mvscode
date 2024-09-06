@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Check if an argument is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <integer>"
+  exit 1
+fi
+
+# Extract the integer argument
+INT=$1
+
+# Define the directory paths
+DATA_DIR="storage1/vscode/client-$INT"
+
+# Run the code-tunnel command with specified data directories
+code tunnel --server-data-dir $DATA_DIR --cli-data-dir $DATA_DIR

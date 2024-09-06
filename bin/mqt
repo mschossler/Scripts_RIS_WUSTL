@@ -1,0 +1,4 @@
+#!/usr/bin/bash
+
+# Command to display quota information
+mmlsquota --block-size auto -u mdeoliveiraschossler rdcw-fs2:home1

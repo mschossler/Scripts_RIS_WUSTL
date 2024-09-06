@@ -1,0 +1,15 @@
+#!/usr/bin/bash
+
+# Path to the file containing the last job ID
+last_job_id="/home/$USER/.bin/last_job_id"
+
+# Check if the file exists
+if [ ! -f "$last_job_id" ]; then
+  echo "Error: Job ID file not found."
+  exit 1
+fi
+
+# Read the job ID from the file
+last_job_id=$(cat "$last_job_id")
+
+bjobs -l "$last_job_id"

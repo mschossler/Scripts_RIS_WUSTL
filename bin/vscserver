@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+# Navigate to the home directory
+cd "$HOME" || { echo "Failed to navigate to home directory"; exit 1; }
+
+# Download the VS Code CLI tarball
+wget -O vscode_cli.tar.gz 'https://code.visualstudio.com/sha/download?build=stable&os=cli-alpine-x64'
+
+# Extract the tarball
+tar -xzf vscode_cli.tar.gz
+
+# Move the extracted files to the .bin directory
+mv code "$HOME/.bin/"
+
+# Clean up the downloaded tarball
+rm vscode_cli.tar.gz
+
+# Start the VS Code tunnel
+"$HOME/.bin/code" tunnel --name ris-compute-exc

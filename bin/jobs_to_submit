@@ -1,0 +1,14 @@
+sjob -c 16 -m 125 -g 4 -t 3 -x
+sjob -c 16 -m 125 -g 2 -t 5
+sjob -c 16 -m 125 -g 2 -t 5
+sjob -c 16 -m 125 -g 1 -t 5
+sjob -c 16 -m 125 -g 4 -t 5 -x
+sjob -c 16 -m 125 -g 3 -t 5 -x
+
+# in execution
+# sjob -c 16 -m 125 -g 2 -t 5
+# sjob -c 16 -m 125 -g 2 -t 5
+# sjob -c 16 -m 125 -g 3 -t 5 -x
+# sjob -c 16 -m 125 -g 2 -t 5 -r "hname!='compute1-exec-396.ris.wustl.edu'"
+# for i in {1..20}; do sjob -c 16 -m 125 -g 2 -t 5; done
+# for i in {1..100}; do sjob -c 20 -m 160 -g 4 -t 5; done

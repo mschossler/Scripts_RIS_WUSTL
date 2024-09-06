@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Directories to clean
+TRASH_DIRS=(
+    "$HOME/.local/share/Trash/files"
+    "$HOME/.local/share/Trash/info"
+    "/root/.local/share/Trash/files"
+    "/root/.local/share/Trash/info"
+)
+
+echo "Emptying trash directories..."
+
+for dir in "${TRASH_DIRS[@]}"; do
+    if [ -d "$dir" ]; then
+        echo "Deleting contents of $dir..."
+        rm -rf "$dir"/*
+    else
+        echo "Directory $dir does not exist or is not accessible."
+    fi
+done
+
+echo "Trash directories have been emptied."
+
+# Optionally, clean up root user trash (uncomment if necessary)
+# sudo rm -rf /root/.local/share/Trash/files/*
+# sudo rm -rf /root/.local/share/Trash/info/*
+
+echo "Done."

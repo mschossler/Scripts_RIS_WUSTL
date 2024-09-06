@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Check if port argument is provided
+if [ -z "$1" ]; then
+  echo "Usage: $0 <port>"
+  exit 1
+fi
+
+PORT=$1
+LOGFILE="~/storage1/screen_logs/tensorboard_output.log"
+
+# Kill any existing TensorBoard processes
+kill $(ps -e | grep 'tensorboard' | awk '{print $1}')
+
+# Create a new screen session and run TensorBoard inside it
+screen -dmS tensorboard bash -c "tensorboard --logdir=$HOME/storage1/ebm_jar/Jarzynski_EBMs/MNIST/lightning_logs/ --port=$PORT --bind_all &> $LOGFILE"
+
+# Wait for TensorBoard to start and capture the URL
+sleep 5
+TENSORBOARD_URL=$(grep -o 'http://compute1-exec[^ ]*' $LOGFILE)
+
+# Output the TensorBoard URL
+echo "TensorBoard is running at $TENSORBOARD_URL"
+
+# # Check the status of the screen session
+# screen -ls

@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+command="bjobs -u mdeoliveiraschossler -o \"jobid stat job_name queue exec_host\""
+
+# Define file paths
+out_dir="/storage1/fs1/zohar/Active/$USER"
+home_file_path="$HOME/current_jobs"
+header="jobid,stat,job_name,queue,exec_host"
+
+# Execute the command, process output, and write to CSV directly
+echo "$header" > "${home_file_path}.csv"
+eval $command | tail -n +2 | tr -s ' ' ',' >> "${home_file_path}.csv"
+echo "Output successfully written to ${home_file_path}.csv"
+
+
+csv_file_path="${out_dir}/current_jobs.csv"
+cp "${home_file_path}.csv" "$csv_file_path"
+
+# Check if the first command succeeded
+if [ $? -ne 0 ]; then
+  # If the first command failed, try the second location
+  out_dir="$HOME/storage1"
+  csv_file_path="${out_dir}/current_jobs.csv"
+  echo "$header" > "$csv_file_path"
+  eval $command | tail -n +2 | tr -s ' ' ',' >> "$csv_file_path"
+  # Check if the second command succeeded
+  if [ $? -eq 0 ]; then
+    echo "Output successfully written to $csv_file_path"
+  else
+    echo "Both attempts failed."
+  fi
+else
+  echo "Output successfully written to $csv_file_path"
+fi
+
+# Process and copy the CSV file
+python3 $HOME/.bin/process_jobs.py
+cp "$HOME/jobs.csv" "${out_dir}/jobs.csv"
+cp "$HOME/jobs.txt" "${out_dir}/jobs.txt"
+echo "Processed jobs successfully written to ${out_dir}/jobs.csv and ${out_dir}/jobs.txt"
+
+
+bjobs -u mdeoliveiraschossler -o "jobid job_name submit_time queue stat exec_host"

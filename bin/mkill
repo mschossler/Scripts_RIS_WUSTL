@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+# Check if at least one JobID is provided as an argument
+if [ $# -eq 0 ]; then
+  echo "Usage: $0 <JobID1> <JobID2> ... <JobIDn>"
+  exit 1
+fi
+
+# Process each JobID
+for JOB_ID in "$@"; do
+  bkill $JOB_ID
+
+  JOB_FILE="$HOME/jobs_submitted.csv"  # Replace with the actual path to your file
+  BACKUP_DIR="/storage1/fs1/zohar/Active/$USER"
+  BACKUP_FILE="$BACKUP_DIR/jobs_submitted.csv"
+  ALTERNATE_BACKUP_DIR="$HOME/storage1"
+  ALTERNATE_BACKUP_FILE="$ALTERNATE_BACKUP_DIR/jobs_submitted.csv"
+
+  # Use grep to find and delete the line with the given JobID
+  grep -v "$JOB_ID" "$JOB_FILE" > "${JOB_FILE}.tmp" && mv "${JOB_FILE}.tmp" "$JOB_FILE"
+
+  if [ $? -eq 0 ]; then
+    echo "Line with JobID $JOB_ID successfully deleted from $JOB_FILE."
+  else
+    echo "An error occurred while trying to delete the line."
+    exit 1
+  fi
+
+  # Copy the updated file to the first backup location
+  cp "$JOB_FILE" "$BACKUP_FILE"
+
+  # Check if the cp command succeeded
+  if [ $? -eq 0 ]; then
+    echo "Output successfully written to $BACKUP_FILE."
+  else
+    echo "Failed to write to $BACKUP_FILE. Attempting alternative location..."
+    # Try copying to the second location
+    cp "$JOB_FILE" "$ALTERNATE_BACKUP_FILE"
+    if [ $? -eq 0 ]; then
+      echo "Output successfully written to $ALTERNATE_BACKUP_FILE."
+    else
+      echo "Both attempts failed."
+      exit 1
+    fi
+  fi
+done
